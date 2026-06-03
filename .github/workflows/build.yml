@@ -1,0 +1,48 @@
+name: Build TWSign iOS App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+    - name: Compile zsign Binary
+      run: |
+        echo "Fetching native signing engine..."
+        git clone https://github.com/zhlynn/zsign.git
+        cd zsign
+        g++ *.cpp -lcrypto -O3 -o zsign
+        cd ..
+        mkdir -p Resources
+        cp zsign/zsign Resources/
+        echo "Signing engine packed successfully."
+
+    - name: Compile Swift App Bundle
+      run: |
+        swift build -c release
+        mkdir -p build/TWSign.app
+        cp .build/release/TWSign build/TWSign.app/
+        cp Resources/Info.plist build/TWSign.app/
+        cp Resources/zsign build/TWSign.app/
+
+    - name: Package into IPA
+      run: |
+        mkdir -p Payload
+        cp -r build/TWSign.app Payload/
+        zip -r TWSign.ipa Payload
+        
+    - name: Upload Finished App Artifact
+      uses: actions/artifacts@v4
+      with:
+        name: TWSign-Build
+        path: TWSign.ipa
